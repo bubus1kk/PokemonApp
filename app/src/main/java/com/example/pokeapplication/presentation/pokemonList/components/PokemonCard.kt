@@ -31,16 +31,13 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.example.pokeapplication.domain.model.Pokemon
 import com.example.pokeapplication.ui.theme.PokedexShadow
+import com.example.pokeapplication.ui.theme.pokemonTypeBackground
 import java.util.Locale
 
 @Composable
 fun PokemonCard(pokemon: Pokemon, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
     val shape = RoundedCornerShape(22.dp)
-    val imageBackground = when (pokemon.types.firstOrNull()?.name) {
-        "grass", "bug" -> MaterialTheme.colorScheme.primaryContainer
-        "fire", "electric" -> MaterialTheme.colorScheme.secondaryContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant
-    }
+    val imageBackground = pokemonTypeBackground(pokemon.types.firstOrNull()?.name)
     val displayName = pokemon.name.replaceFirstChar { it.titlecase(Locale.ROOT) }
     var imageLoaded by remember(pokemon.imageUrl) { mutableStateOf(false) }
 

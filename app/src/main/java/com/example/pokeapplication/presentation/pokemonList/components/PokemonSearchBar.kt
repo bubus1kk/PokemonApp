@@ -1,5 +1,7 @@
 package com.example.pokeapplication.presentation.pokemonlist.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -23,10 +25,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.disabled
-import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -37,11 +37,14 @@ import com.example.pokeapplication.ui.theme.PokedexShadow
 fun PokemonSearchBar(
     query: String,
     onQueryChanged: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onFilterClick: () -> Unit = {},
+    filtersExpanded: Boolean = false,
+    hasActiveFilters: Boolean = false
 ) {
     val focusManager = LocalFocusManager.current
     val searchHint = stringResource(R.string.home_search_hint)
-    val filterLabel = stringResource(R.string.home_filter)
+    val filterLabel = stringResource(if (filtersExpanded) R.string.filters_close else R.string.home_filter)
     val shape = RoundedCornerShape(18.dp)
 
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -83,22 +86,28 @@ fun PokemonSearchBar(
                 }
             )
         }
-        // Visual placeholder until the separate filters interaction is implemented.
         Surface(
+            onClick = {
+                focusManager.clearFocus()
+                onFilterClick()
+            },
             modifier = Modifier.size(52.dp).shadow(
                 5.dp, shape,
                 ambientColor = PokedexShadow.copy(alpha = 0.04f),
                 spotColor = PokedexShadow.copy(alpha = 0.08f)
             ).semantics {
                 contentDescription = filterLabel
-                role = Role.Button
-                disabled()
+                selected = filtersExpanded || hasActiveFilters
             },
             shape = shape,
             color = MaterialTheme.colorScheme.primaryContainer
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(painterResource(R.drawable.ic_filter), null, modifier = Modifier.size(20.dp))
+                if (hasActiveFilters) {
+                    Box(Modifier.align(Alignment.TopEnd).padding(8.dp).size(6.dp)
+                        .background(MaterialTheme.colorScheme.onSurface, CircleShape))
+                }
             }
         }
     }

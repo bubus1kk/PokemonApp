@@ -32,4 +32,16 @@
     <string name="details_special_attack">Special attack</string>
     <string name="details_special_defense">Special defense</string>
     <string name="details_speed">Speed</string>
+    <string name="filters_title">Filters</string>
+    <string name="filters_close">Close filters</string>
+    <string name="filters_reset">Reset</string>
+    <string name="filters_type">Type · swipe for more</string>
+    <string name="filters_all">All</string>
+    <string name="favorites_subtitle">Your favorite Pokémon</string>
+    <string name="favorites_empty">No favorites yet. Tap the heart on a Pokémon to add it here.</string>
+    <string name="filters_sort">Sort by</string>
+    <string name="filters_number_asc">Number ↑</string>
+    <string name="filters_number_desc">Number ↓</string>
+    <string name="filters_name_asc">A–Z</string>
+    <string name="filters_name_desc">Z–A</string>
 </resources>

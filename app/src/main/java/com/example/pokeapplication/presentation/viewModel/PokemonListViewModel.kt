@@ -1,6 +1,7 @@
 package com.example.pokeapplication.presentation.viewModel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.example.pokeapplication.domain.model.PokemonSortOrder
 import com.example.pokeapplication.domain.usecase.GetPokemonListUseCase
@@ -19,12 +20,15 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class PokemonListViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     private val getPokemonList: GetPokemonListUseCase,
     private val refreshPokemon: RefreshPokemonUseCase,
     private val toggleFavorite: ToggleFavoriteUseCase
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(PokemonListUiState())
+    // Each navigation destination owns its list state. Favorites is a fixed list mode.
+    private val favoritesOnly = savedStateHandle.get<Boolean>("onlyFavorites") ?: false
+    private val _uiState = MutableStateFlow(PokemonListUiState(onlyFavorites = favoritesOnly))
     val uiState = _uiState.asStateFlow()
 
     private var observeJob: Job? = null
@@ -32,18 +36,11 @@ class PokemonListViewModel @Inject constructor(
 
     init {
         observePokemons()
-        onRefresh()
+        if (!favoritesOnly) onRefresh()
     }
 
     fun onQueryChanged(query: String) {
         _uiState.update { it.copy(query = query) }
-        observePokemons()
-    }
-
-    fun onFavoritesFilterChanged(onlyFavorites: Boolean) {
-        _uiState.update {
-            it.copy(onlyFavorites = onlyFavorites)
-        }
         observePokemons()
     }
 
@@ -58,6 +55,10 @@ class PokemonListViewModel @Inject constructor(
     }
 
     fun onRefresh() {
+        if (favoritesOnly) {
+            observePokemons()
+            return
+        }
         if (refreshJob?.isActive == true) return
 
         if (observeJob?.isActive != true) {
@@ -111,6 +112,9 @@ class PokemonListViewModel @Inject constructor(
         val currentState = _uiState.value
 
         observeJob = viewModelScope.launch {
+            if (favoritesOnly) {
+                _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            }
             try {
                 getPokemonList(
                     query = currentState.query,
@@ -119,7 +123,8 @@ class PokemonListViewModel @Inject constructor(
                     sortOrder = currentState.sortOrder
                 ).collect { pokemons ->
                     _uiState.update {
-                        it.copy(pokemons = pokemons)
+                        it.copy(pokemons = pokemons,
+                            isLoading = if (favoritesOnly) false else it.isLoading)
                     }
                 }
             } catch (exception: CancellationException) {
@@ -127,7 +132,8 @@ class PokemonListViewModel @Inject constructor(
             } catch (exception: Exception) {
                 _uiState.update {
                     it.copy(
-                        errorMessage = "Не удалось прочитать список покемонов"
+                        errorMessage = "Не удалось прочитать список покемонов",
+                        isLoading = if (favoritesOnly) false else it.isLoading
                     )
                 }
             }

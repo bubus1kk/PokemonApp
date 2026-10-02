@@ -51,6 +51,7 @@ import com.example.pokeapplication.R
 import com.example.pokeapplication.domain.model.Pokemon
 import com.example.pokeapplication.presentation.viewModel.PokemonDetailsViewModel
 import com.example.pokeapplication.ui.theme.PokedexShadow
+import com.example.pokeapplication.ui.theme.pokemonTypeBackground
 import java.util.Locale
 
 @Composable
@@ -191,11 +192,7 @@ private fun DetailsToolbar(
 @Composable
 private fun PokemonHero(pokemon: Pokemon) {
     var imageLoaded by remember(pokemon.imageUrl) { mutableStateOf(false) }
-    val color = when (pokemon.types.firstOrNull()?.name) {
-        "grass", "bug" -> MaterialTheme.colorScheme.primaryContainer
-        "fire", "electric" -> MaterialTheme.colorScheme.secondaryContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant
-    }
+    val color = pokemonTypeBackground(pokemon.types.firstOrNull()?.name)
     Box(
         modifier = Modifier.fillMaxWidth().aspectRatio(343f / 300f)
             .clip(RoundedCornerShape(28.dp)).background(color),

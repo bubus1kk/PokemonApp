@@ -61,6 +61,30 @@ private fun HomeLoadingPreview() {
     }
 }
 
+@Preview(name = "Favorites", widthDp = 390, heightDp = 844)
+@Preview(name = "Compact favorites", widthDp = 320, heightDp = 640)
+@Composable
+fun FavoritesPreview() {
+    PokeApplicationTheme {
+        HomeContent(
+            uiState = PokemonListUiState(
+                pokemons = previewPokemons.filter { it.id == 1 || it.id == 25 }.map { it.copy(isFavorite = true) },
+                onlyFavorites = true
+            ),
+            onQueryChanged = {},
+            onRetry = {}
+        )
+    }
+}
+
+@Preview(name = "Empty favorites", widthDp = 390, heightDp = 844)
+@Composable
+private fun EmptyFavoritesPreview() {
+    PokeApplicationTheme {
+        HomeContent(PokemonListUiState(onlyFavorites = true), {}, {})
+    }
+}
+
 @Preview(name = "Error", widthDp = 390, heightDp = 844)
 @Composable
 private fun HomeErrorPreview() {

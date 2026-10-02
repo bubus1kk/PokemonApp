@@ -2,6 +2,8 @@ package com.example.pokeapplication.presentation.pokemonlist.components
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,16 +23,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.disabled
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.pokeapplication.R
 import com.example.pokeapplication.ui.theme.PokedexShadow
 
 @Composable
-fun FloatingBottomBar(modifier: Modifier = Modifier) {
+fun FloatingBottomBar(
+    modifier: Modifier = Modifier,
+    isFavorites: Boolean = false,
+    onHomeClick: () -> Unit = {},
+    onFavoritesClick: () -> Unit = {}
+) {
     val shape = RoundedCornerShape(28.dp)
     Surface(
         modifier = modifier.shadow(
@@ -46,8 +49,8 @@ fun FloatingBottomBar(modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            BottomBarItem(R.drawable.ic_home, stringResource(R.string.home_tab), true, Modifier.weight(1f))
-            BottomBarItem(R.drawable.ic_favorites, stringResource(R.string.favorites_tab), false, Modifier.weight(1f))
+            BottomBarItem(R.drawable.ic_home, stringResource(R.string.home_tab), !isFavorites, Modifier.weight(1f), onHomeClick)
+            BottomBarItem(R.drawable.ic_favorites, stringResource(R.string.favorites_tab), isFavorites, Modifier.weight(1f), onFavoritesClick)
             BottomBarItem(R.drawable.ic_types, stringResource(R.string.types_tab), false, Modifier.weight(1f))
             BottomBarItem(R.drawable.ic_profile, stringResource(R.string.profile_tab), false, Modifier.weight(1f))
         }
@@ -59,20 +62,18 @@ private fun BottomBarItem(
     @DrawableRes icon: Int,
     label: String,
     isSelected: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
 ) {
-    // Navigation is intentionally out of scope; these items expose their visual state only.
     Column(
         modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
             .background(
                 if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                 RoundedCornerShape(20.dp)
             )
-            .semantics(mergeDescendants = true) {
-                role = Role.Tab
-                selected = isSelected
-                if (!isSelected) disabled()
-            }
+            .selectable(selected = isSelected, enabled = onClick != null,
+                role = Role.Tab, onClick = { onClick?.invoke() })
             .padding(horizontal = 2.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
