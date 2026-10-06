@@ -27,7 +27,7 @@ private val previewPokemon = Pokemon(
 fun PokemonDetailsPreview() {
     var pokemon by remember { mutableStateOf(previewPokemon) }
     PokeApplicationTheme {
-        PokemonDetailsContent(PokemonDetailsUiState(pokemon = pokemon, isLoading = false),
+        PokemonDetailsContent(PokemonDetailsUiState(pokemon = pokemon, isLoading = false, isNotesLoading = false),
             onBack = {}, onRetry = {}, onFavoriteClick = { pokemon = pokemon.copy(isFavorite = !pokemon.isFavorite) })
     }
 }

@@ -44,4 +44,18 @@
     <string name="filters_number_desc">Number ↓</string>
     <string name="filters_name_asc">A–Z</string>
     <string name="filters_name_desc">Z–A</string>
+    <string name="notes_title">Notes</string>
+    <string name="notes_loading">Loading notes</string>
+    <string name="notes_empty">No notes for this Pokémon yet.</string>
+    <string name="notes_add">Add note</string>
+    <string name="notes_editor_title">New note</string>
+    <string name="notes_text_label">Note</string>
+    <string name="notes_save">Save</string>
+    <string name="notes_cancel">Cancel</string>
+    <string name="notes_saving">Saving note</string>
+    <string name="notes_saved">Данные сохранены</string>
+    <string name="notes_edit">Edit</string>
+    <string name="notes_delete">Delete</string>
+    <string name="notes_edit_title">Edit note</string>
+    <string name="notes_deleting">Deleting note</string>
 </resources>

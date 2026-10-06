@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -23,9 +25,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.getValue
@@ -46,6 +51,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.flow.collect
 import coil3.compose.AsyncImage
 import com.example.pokeapplication.R
 import com.example.pokeapplication.domain.model.Pokemon
@@ -61,13 +70,49 @@ fun PokemonDetailsScreen(
     viewModel: PokemonDetailsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    PokemonDetailsContent(
-        uiState = uiState,
-        onBack = onBack,
-        onRetry = viewModel::loadPokemon,
-        onFavoriteClick = viewModel::onFavoriteClick,
-        modifier = modifier
-    )
+    val snackbarHostState = remember { SnackbarHostState() }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val savedMessage = stringResource(R.string.notes_saved)
+
+    LaunchedEffect(viewModel, lifecycleOwner, savedMessage) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.events.collect { event ->
+                when (event) {
+                    PokemonDetailsEvent.NoteSaved -> snackbarHostState.showSnackbar(savedMessage)
+                }
+            }
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        PokemonDetailsContent(
+            uiState = uiState,
+            onBack = onBack,
+            onRetry = viewModel::loadPokemon,
+            onFavoriteClick = viewModel::onFavoriteClick,
+            onNotesRetry = viewModel::observeNotes,
+            onAddNote = viewModel::onAddNoteClick,
+            onEditNote = viewModel::onEditNoteClick,
+            onDeleteNote = viewModel::onDeleteNoteClick
+        )
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+                .navigationBarsPadding().imePadding().padding(16.dp)
+        )
+    }
+
+    if (uiState.showNoteEditor) {
+        PokemonNoteEditor(
+            text = uiState.noteText,
+            isSaving = uiState.isSavingNote,
+            errorMessage = uiState.noteFormErrorMessage,
+            onTextChanged = viewModel::onNoteTextChanged,
+            onSave = viewModel::onSaveNote,
+            onDismiss = viewModel::onNoteEditorDismiss,
+            isEditing = uiState.editingNoteId != null
+        )
+    }
 }
 
 @Composable
@@ -76,7 +121,11 @@ fun PokemonDetailsContent(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onFavoriteClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNotesRetry: () -> Unit = {},
+    onAddNote: (() -> Unit)? = null,
+    onEditNote: ((Int) -> Unit)? = null,
+    onDeleteNote: ((Int) -> Unit)? = null
 ) {
     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
         Column(
@@ -132,6 +181,19 @@ fun PokemonDetailsContent(
                         if (pokemon.stats.isNotEmpty()) {
                             item { PokemonStats(pokemon) }
                         }
+                        pokemonNotesSection(
+                            notes = uiState.notes,
+                            isLoading = uiState.isNotesLoading,
+                            errorMessage = uiState.notesErrorMessage,
+                            onRetry = onNotesRetry,
+                            onAddNote = onAddNote,
+                            isSavingNote = uiState.isSavingNote,
+                            deletingNoteId = uiState.deletingNoteId,
+                            actionErrorMessage = uiState.noteActionErrorMessage,
+                            showNoteEditor = uiState.showNoteEditor,
+                            onEditNote = onEditNote,
+                            onDeleteNote = onDeleteNote
+                        )
                     }
                 }
             }
