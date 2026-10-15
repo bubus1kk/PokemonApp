@@ -31,8 +31,10 @@ import com.example.pokeapplication.ui.theme.PokedexShadow
 fun FloatingBottomBar(
     modifier: Modifier = Modifier,
     isFavorites: Boolean = false,
+    isTypes: Boolean = false,
     onHomeClick: () -> Unit = {},
-    onFavoritesClick: () -> Unit = {}
+    onFavoritesClick: () -> Unit = {},
+    onTypesClick: () -> Unit = {}
 ) {
     val shape = RoundedCornerShape(28.dp)
     Surface(
@@ -49,10 +51,9 @@ fun FloatingBottomBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            BottomBarItem(R.drawable.ic_home, stringResource(R.string.home_tab), !isFavorites, Modifier.weight(1f), onHomeClick)
+            BottomBarItem(R.drawable.ic_home, stringResource(R.string.home_tab), !isFavorites && !isTypes, Modifier.weight(1f), onHomeClick)
             BottomBarItem(R.drawable.ic_favorites, stringResource(R.string.favorites_tab), isFavorites, Modifier.weight(1f), onFavoritesClick)
-            BottomBarItem(R.drawable.ic_types, stringResource(R.string.types_tab), false, Modifier.weight(1f))
-            BottomBarItem(R.drawable.ic_profile, stringResource(R.string.profile_tab), false, Modifier.weight(1f))
+            BottomBarItem(R.drawable.ic_types, stringResource(R.string.types_tab), isTypes, Modifier.weight(1f), onTypesClick)
         }
     }
 }

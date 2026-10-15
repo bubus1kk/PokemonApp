@@ -24,6 +24,7 @@ import com.example.pokeapplication.presentation.pokemondetails.PokemonDetailsEve
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.receiveAsFlow
+import com.example.pokeapplication.domain.repository.PokemonPhotoRepository
 
 @HiltViewModel
 class PokemonDetailsViewModel @Inject constructor(
@@ -31,7 +32,8 @@ class PokemonDetailsViewModel @Inject constructor(
     private val noteRepository: PokemonNoteRepository,
     savedStateHandle: SavedStateHandle,
     private val getPokemonById: GetPokemonByIdUseCase,
-    private val toggleFavorite: ToggleFavoriteUseCase
+    private val toggleFavorite: ToggleFavoriteUseCase,
+    private val photoRepository: PokemonPhotoRepository
 ) : ViewModel() {
     private val pokemonId = savedStateHandle.toRoute<PokemonDetailsRoute>().pokemonId
     private val _uiState = MutableStateFlow(PokemonDetailsUiState())
@@ -43,6 +45,7 @@ class PokemonDetailsViewModel @Inject constructor(
     private var loadJob: Job? = null
     private var favoriteJob: Job? = null
 
+    private var photoJob: Job? = null
     private var notesJob: Job? = null
 
     private var saveNoteJob: Job? = null
@@ -52,6 +55,7 @@ class PokemonDetailsViewModel @Inject constructor(
     init {
         loadPokemon()
         observeNotes()
+        loadPhotos()
     }
 
     fun loadPokemon() {
@@ -266,6 +270,155 @@ class PokemonDetailsViewModel @Inject constructor(
             } finally {
                 _uiState.update {
                     it.copy(deletingNoteId = null)
+                }
+            }
+        }
+    }
+
+    fun loadPhotos() {
+        if (photoJob?.isActive == true) return
+
+        photoJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isPhotosLoading = true,
+                    photosErrorMessage = null
+                )
+            }
+
+            try {
+                val photos = photoRepository.getPhotos(pokemonId)
+
+                _uiState.update {
+                    it.copy(
+                        photos = photos,
+                        photosNeedReload = false
+                    )
+                }
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        photosErrorMessage = "Не удалось загрузить фотографии"
+                    )
+                }
+            } finally {
+                _uiState.update {
+                    it.copy(isPhotosLoading = false)
+                }
+            }
+        }
+    }
+
+    fun onPhotoSelected(sourceUri: String) {
+        if (photoJob?.isActive == true) return
+        if (sourceUri.isBlank()) return
+
+        _uiState.update {
+            it.copy(
+                selectedPhotoUri = sourceUri,
+                photosErrorMessage = if (it.photosNeedReload) {
+                    it.photosErrorMessage
+                } else {
+                    null
+                }
+            )
+        }
+    }
+
+    fun onPhotoPreviewDismiss() {
+        if (_uiState.value.isUploadingPhoto) return
+
+        _uiState.update {
+            it.copy(selectedPhotoUri = null)
+        }
+    }
+
+    fun onUploadPhoto() {
+        if (photoJob?.isActive == true) return
+
+        val state = _uiState.value
+        val sourceUri = state.selectedPhotoUri ?: return
+
+        if (state.photosNeedReload) return
+
+        photoJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isUploadingPhoto = true,
+                    photosErrorMessage = null
+                )
+            }
+
+            try {
+                val photo = photoRepository.uploadPhoto(
+                    pokemonId = pokemonId,
+                    sourceUri = sourceUri
+                )
+
+                _uiState.update {
+                    it.copy(
+                        photos = listOf(photo) + it.photos,
+                        selectedPhotoUri = null
+                    )
+                }
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        selectedPhotoUri = null,
+                        photosNeedReload = true,
+                        photosErrorMessage =
+                            "Не удалось завершить загрузку. Обновите альбом и проверьте, сохранилась ли фотография."
+                    )
+                }
+            } finally {
+                _uiState.update {
+                    it.copy(isUploadingPhoto = false)
+                }
+            }
+        }
+    }
+
+    fun onDeletePhotoClick(photoId: String) {
+        if (photoJob?.isActive == true) return
+
+        val state = _uiState.value
+        if (state.photos.none { it.id == photoId }) return
+
+        photoJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    deletingPhotoId = photoId,
+                    photosErrorMessage = null
+                )
+            }
+
+            try {
+                photoRepository.deletePhoto(photoId)
+
+                _uiState.update {
+                    it.copy(
+                        photos = it.photos.filterNot { photo ->
+                            photo.id == photoId
+                        }
+                    )
+                }
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        photosErrorMessage =
+                            "Не удалось завершить удаление фотографии. " +
+                                    "Повторите попытку."
+                    )
+                }
+            } finally {
+                _uiState.update {
+                    it.copy(deletingPhotoId = null)
                 }
             }
         }

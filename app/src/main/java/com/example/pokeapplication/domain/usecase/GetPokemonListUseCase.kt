@@ -9,12 +9,7 @@ import kotlinx.coroutines.flow.map
 
 class GetPokemonListUseCase @Inject constructor(private val repository: PokemonRepository) {
 
-    operator fun invoke(
-        query: String = "",
-        onlyFavorites: Boolean = false,
-        typeName: String? = null,
-        sortOrder: PokemonSortOrder = PokemonSortOrder.ID_ASC
-    ): Flow<List<Pokemon>> {
+    operator fun invoke(query: String = "", onlyFavorites: Boolean = false, typeName: String? = null, sortOrder: PokemonSortOrder = PokemonSortOrder.ID_ASC): Flow<List<Pokemon>> {
         val searchQuery = query.trim()
         val searchedId = searchQuery.toIntOrNull()
 

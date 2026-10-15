@@ -6,22 +6,12 @@ import com.example.pokeapplication.domain.model.Pokemon
 import com.example.pokeapplication.domain.repository.PokemonRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 
 class PokemonRepositoryImpl @Inject constructor(private val localDataSource: PokemonLocalDataSource,
-    private val remoteDataSource: PokemonRemoteDataSource
-) : PokemonRepository {
+    private val remoteDataSource: PokemonRemoteDataSource) : PokemonRepository {
 
     override fun getPokemonList(): Flow<List<Pokemon>> {
         return localDataSource.observePokemons()
-    }
-
-    override fun getFavoritePokemons(): Flow<List<Pokemon>> {
-        return localDataSource.observePokemons().map { pokemons ->
-            pokemons.filter { pokemon ->
-                pokemon.isFavorite
-            }
-        }
     }
 
     override suspend fun getPokemonById(pokemonId: Int): Pokemon? {

@@ -28,7 +28,7 @@ import com.example.pokeapplication.ui.theme.PokedexShadow
 import java.util.Locale
 
 // Options remain available even when no Pokémon matches the selected filters.
-private val pokemonTypes = listOf(
+internal val pokemonTypes = listOf(
     "grass", "fire", "water", "electric", "normal", "poison", "bug", "flying",
     "ground", "rock", "fighting", "psychic", "ice", "ghost", "dragon", "dark", "steel", "fairy"
 )
@@ -40,9 +40,10 @@ fun PokemonFiltersPanel(
     onTypeChanged: (String?) -> Unit,
     onSortOrderChanged: (PokemonSortOrder) -> Unit,
     onReset: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    allowTypeChange: Boolean = true
 ) {
-    val hasFilters = typeName != null || sortOrder != PokemonSortOrder.ID_ASC
+    val hasFilters = (allowTypeChange && typeName != null) || sortOrder != PokemonSortOrder.ID_ASC
     val shape = RoundedCornerShape(22.dp)
     Surface(
         modifier = modifier.fillMaxWidth().shadow(4.dp, shape,
@@ -61,16 +62,18 @@ fun PokemonFiltersPanel(
                             else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            Text(stringResource(R.string.filters_type), style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item(key = "all") {
-                    FilterOption(stringResource(R.string.filters_all), typeName == null,
-                        onClick = { onTypeChanged(null) })
-                }
-                items(pokemonTypes, key = { it }) { type ->
-                    FilterOption(type.replaceFirstChar { it.titlecase(Locale.ROOT) }, typeName == type,
-                        onClick = { onTypeChanged(if (typeName == type) null else type) })
+            if (allowTypeChange) {
+                Text(stringResource(R.string.filters_type), style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item(key = "all") {
+                        FilterOption(stringResource(R.string.filters_all), typeName == null,
+                            onClick = { onTypeChanged(null) })
+                    }
+                    items(pokemonTypes, key = { it }) { type ->
+                        FilterOption(type.replaceFirstChar { it.titlecase(Locale.ROOT) }, typeName == type,
+                            onClick = { onTypeChanged(if (typeName == type) null else type) })
+                    }
                 }
             }
             Text(stringResource(R.string.filters_sort), style = MaterialTheme.typography.labelMedium,

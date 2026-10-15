@@ -15,6 +15,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -26,17 +27,45 @@ class PokemonListViewModel @Inject constructor(
     private val toggleFavorite: ToggleFavoriteUseCase
 ) : ViewModel() {
 
-    // Each navigation destination owns its list state. Favorites is a fixed list mode.
     private val favoritesOnly = savedStateHandle.get<Boolean>("onlyFavorites") ?: false
-    private val _uiState = MutableStateFlow(PokemonListUiState(onlyFavorites = favoritesOnly))
+    private val initialTypeName = savedStateHandle.get<String>("typeName")
+    private val localOnly = favoritesOnly || initialTypeName != null
+    private val _uiState = MutableStateFlow(
+        PokemonListUiState(onlyFavorites = favoritesOnly, typeName = initialTypeName, isLoading = true)
+    )
     val uiState = _uiState.asStateFlow()
 
     private var observeJob: Job? = null
     private var refreshJob: Job? = null
+    private var hasCachedPokemons = false
 
     init {
         observePokemons()
-        if (!favoritesOnly) onRefresh()
+        if (!localOnly) initializePokemons()
+    }
+
+    private fun initializePokemons() {
+        viewModelScope.launch {
+            try {
+                val storedPokemons = getPokemonList().first()
+                hasCachedPokemons = storedPokemons.isNotEmpty()
+
+                _uiState.update {
+                    it.copy(isLoading = !hasCachedPokemons)
+                }
+
+                onRefresh()
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = "Не удалось прочитать сохранённых покемонов"
+                    )
+                }
+            }
+        }
     }
 
     fun onQueryChanged(query: String) {
@@ -55,7 +84,7 @@ class PokemonListViewModel @Inject constructor(
     }
 
     fun onRefresh() {
-        if (favoritesOnly) {
+        if (localOnly) {
             observePokemons()
             return
         }
@@ -67,11 +96,12 @@ class PokemonListViewModel @Inject constructor(
 
         refreshJob = viewModelScope.launch {
             _uiState.update {
-                it.copy(isLoading = true, errorMessage = null)
+                it.copy(isLoading = !hasCachedPokemons, errorMessage = null)
             }
 
             try {
                 refreshPokemon()
+                hasCachedPokemons = true
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
@@ -112,7 +142,7 @@ class PokemonListViewModel @Inject constructor(
         val currentState = _uiState.value
 
         observeJob = viewModelScope.launch {
-            if (favoritesOnly) {
+            if (localOnly) {
                 _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             }
             try {
@@ -124,7 +154,7 @@ class PokemonListViewModel @Inject constructor(
                 ).collect { pokemons ->
                     _uiState.update {
                         it.copy(pokemons = pokemons,
-                            isLoading = if (favoritesOnly) false else it.isLoading)
+                            isLoading = if (localOnly) false else it.isLoading)
                     }
                 }
             } catch (exception: CancellationException) {
@@ -133,7 +163,7 @@ class PokemonListViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         errorMessage = "Не удалось прочитать список покемонов",
-                        isLoading = if (favoritesOnly) false else it.isLoading
+                        isLoading = false
                     )
                 }
             }

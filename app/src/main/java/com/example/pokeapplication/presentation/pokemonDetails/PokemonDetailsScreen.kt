@@ -62,6 +62,15 @@ import com.example.pokeapplication.presentation.viewModel.PokemonDetailsViewMode
 import com.example.pokeapplication.ui.theme.PokedexShadow
 import com.example.pokeapplication.ui.theme.pokemonTypeBackground
 import java.util.Locale
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.net.toUri
+import com.example.pokeapplication.data.local.CameraPhotoFileFactory
+import kotlinx.coroutines.launch
 
 @Composable
 fun PokemonDetailsScreen(
@@ -73,6 +82,114 @@ fun PokemonDetailsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val lifecycleOwner = LocalLifecycleOwner.current
     val savedMessage = stringResource(R.string.notes_saved)
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var pendingCameraUri by rememberSaveable {
+        mutableStateOf<String?>(null)
+    }
+    var selectedCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var isGalleryOpen by rememberSaveable { mutableStateOf(false) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        isGalleryOpen = false
+        if (uri != null) {
+            viewModel.onPhotoSelected(uri.toString())
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        val uriString = pendingCameraUri
+        pendingCameraUri = null
+
+        if (uriString != null) {
+            if (success) {
+                selectedCameraUri = uriString
+                viewModel.onPhotoSelected(uriString)
+            } else {
+                runCatching {
+                    context.contentResolver.delete(
+                        uriString.toUri(),
+                        null,
+                        null
+                    )
+                }
+            }
+        }
+    }
+
+    val photoActionsEnabled =
+        !uiState.isPhotosLoading &&
+                !uiState.isUploadingPhoto &&
+                uiState.deletingPhotoId == null &&
+                pendingCameraUri == null &&
+                !isGalleryOpen &&
+                uiState.selectedPhotoUri == null &&
+                !uiState.showNoteEditor
+
+    // Only our camera file is temporary; gallery originals must never be deleted.
+    LaunchedEffect(uiState.selectedPhotoUri, uiState.isUploadingPhoto, selectedCameraUri) {
+        val uriString = selectedCameraUri
+        if (uriString != null && uiState.selectedPhotoUri != uriString && !uiState.isUploadingPhoto) {
+            runCatching { context.contentResolver.delete(uriString.toUri(), null, null) }
+            selectedCameraUri = null
+        }
+    }
+
+    val onChoosePhoto: () -> Unit = {
+        if (photoActionsEnabled) {
+            try {
+                isGalleryOpen = true
+                galleryLauncher.launch(
+                    PickVisualMediaRequest(
+                        ActivityResultContracts.PickVisualMedia.ImageOnly
+                    )
+                )
+            } catch (exception: Exception) {
+                isGalleryOpen = false
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        "Не удалось открыть выбор фотографии"
+                    )
+                }
+            }
+        }
+    }
+
+    val onTakePhoto: () -> Unit = {
+        if (photoActionsEnabled) {
+            try {
+                val uri = CameraPhotoFileFactory.createUri(context)
+                pendingCameraUri = uri.toString()
+
+                cameraLauncher.launch(uri)
+            } catch (exception: Exception) {
+                val uriString = pendingCameraUri
+                pendingCameraUri = null
+
+                if (uriString != null) {
+                    runCatching {
+                        context.contentResolver.delete(
+                            uriString.toUri(),
+                            null,
+                            null
+                        )
+                    }
+                }
+
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        "Не удалось открыть камеру"
+                    )
+                }
+            }
+        }
+    }
 
     LaunchedEffect(viewModel, lifecycleOwner, savedMessage) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -93,7 +210,12 @@ fun PokemonDetailsScreen(
             onNotesRetry = viewModel::observeNotes,
             onAddNote = viewModel::onAddNoteClick,
             onEditNote = viewModel::onEditNoteClick,
-            onDeleteNote = viewModel::onDeleteNoteClick
+            onDeleteNote = viewModel::onDeleteNoteClick,
+            onChoosePhoto = onChoosePhoto,
+            onTakePhoto = onTakePhoto,
+            onPhotosRetry = viewModel::loadPhotos,
+            onDeletePhoto = viewModel::onDeletePhotoClick,
+            photoActionsEnabled = photoActionsEnabled
         )
         SnackbarHost(
             hostState = snackbarHostState,
@@ -113,6 +235,17 @@ fun PokemonDetailsScreen(
             isEditing = uiState.editingNoteId != null
         )
     }
+
+    uiState.selectedPhotoUri?.let { sourceUri ->
+        PokemonPhotoPreviewDialog(
+            sourceUri = sourceUri,
+            isUploading = uiState.isUploadingPhoto,
+            canUpload = !uiState.photosNeedReload && !uiState.isPhotosLoading &&
+                uiState.deletingPhotoId == null,
+            onUpload = viewModel::onUploadPhoto,
+            onDismiss = viewModel::onPhotoPreviewDismiss
+        )
+    }
 }
 
 @Composable
@@ -125,7 +258,12 @@ fun PokemonDetailsContent(
     onNotesRetry: () -> Unit = {},
     onAddNote: (() -> Unit)? = null,
     onEditNote: ((Int) -> Unit)? = null,
-    onDeleteNote: ((Int) -> Unit)? = null
+    onDeleteNote: ((Int) -> Unit)? = null,
+    onChoosePhoto: (() -> Unit)? = null,
+    onTakePhoto: (() -> Unit)? = null,
+    onPhotosRetry: () -> Unit = {},
+    onDeletePhoto: ((String) -> Unit)? = null,
+    photoActionsEnabled: Boolean = true
 ) {
     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
         Column(
@@ -193,6 +331,15 @@ fun PokemonDetailsContent(
                             showNoteEditor = uiState.showNoteEditor,
                             onEditNote = onEditNote,
                             onDeleteNote = onDeleteNote
+                        )
+                        pokemonPhotosSection(
+                            uiState = uiState,
+                            onRetry = onPhotosRetry,
+                            onChoosePhoto = onChoosePhoto,
+                            onTakePhoto = onTakePhoto,
+                            onDeletePhoto = onDeletePhoto,
+                            actionsEnabled = photoActionsEnabled && !uiState.isPhotosLoading &&
+                                !uiState.isUploadingPhoto && uiState.deletingPhotoId == null
                         )
                     }
                 }

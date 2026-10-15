@@ -23,7 +23,6 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +52,8 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     onHomeClick: () -> Unit = {},
     onFavoritesClick: () -> Unit = {},
+    onTypesClick: () -> Unit = {},
+    isTypeList: Boolean = false,
     viewModel: PokemonListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -60,16 +61,17 @@ fun HomeScreen(
     HomeContent(
         uiState = uiState,
         onQueryChanged = viewModel::onQueryChanged,
-        onRetry = viewModel::onRefresh,
         onPokemonClick = onPokemonClick,
         onTypeChanged = viewModel::onTypeChanged,
         onSortOrderChanged = viewModel::onSortOrderChanged,
         onResetFilters = {
-            if (uiState.typeName != null) viewModel.onTypeChanged(null)
+            if (!isTypeList && uiState.typeName != null) viewModel.onTypeChanged(null)
             if (uiState.sortOrder != PokemonSortOrder.ID_ASC) viewModel.onSortOrderChanged(PokemonSortOrder.ID_ASC)
         },
         onHomeClick = onHomeClick,
         onFavoritesClick = onFavoritesClick,
+        onTypesClick = onTypesClick,
+        isTypeList = isTypeList,
         modifier = modifier
     )
 }
@@ -78,14 +80,15 @@ fun HomeScreen(
 fun HomeContent(
     uiState: PokemonListUiState,
     onQueryChanged: (String) -> Unit,
-    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     onPokemonClick: (Int) -> Unit = {},
     onTypeChanged: (String?) -> Unit = {},
     onSortOrderChanged: (PokemonSortOrder) -> Unit = {},
     onResetFilters: () -> Unit = {},
     onHomeClick: () -> Unit = {},
-    onFavoritesClick: () -> Unit = {}
+    onFavoritesClick: () -> Unit = {},
+    onTypesClick: () -> Unit = {},
+    isTypeList: Boolean = false
 ) {
     var filtersExpanded by rememberSaveable { mutableStateOf(false) }
     val gridState = rememberLazyGridState()
@@ -93,7 +96,7 @@ fun HomeContent(
     fun scrollToStart() {
         scope.launch { gridState.scrollToItem(0) }
     }
-    val hasActiveFilters = uiState.typeName != null || uiState.sortOrder != PokemonSortOrder.ID_ASC
+    val hasActiveFilters = (!isTypeList && uiState.typeName != null) || uiState.sortOrder != PokemonSortOrder.ID_ASC
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -104,6 +107,7 @@ fun HomeContent(
         Column(Modifier.fillMaxSize()) {
             HomeHeader(
                 isFavorites = uiState.onlyFavorites,
+                typeName = if (isTypeList) uiState.typeName else null,
                 modifier = Modifier.padding(start = 24.dp, top = 24.dp, end = 24.dp)
             )
             PokemonSearchBar(
@@ -125,20 +129,22 @@ fun HomeContent(
             PokemonGrid(
                 gridState = gridState,
                 uiState = uiState,
-                onRetry = onRetry,
                 onPokemonClick = onPokemonClick,
                 filtersExpanded = filtersExpanded,
                 onTypeChanged = { onTypeChanged(it); scrollToStart() },
                 onSortOrderChanged = { onSortOrderChanged(it); scrollToStart() },
                 onResetFilters = { onResetFilters(); scrollToStart() },
+                allowTypeChange = !isTypeList,
                 modifier = Modifier.weight(1f)
             )
         }
 
         FloatingBottomBar(
             isFavorites = uiState.onlyFavorites,
+            isTypes = isTypeList,
             onHomeClick = onHomeClick,
             onFavoritesClick = onFavoritesClick,
+            onTypesClick = onTypesClick,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(start = 24.dp, end = 24.dp, bottom = 16.dp)
@@ -148,18 +154,21 @@ fun HomeContent(
 }
 
 @Composable
-private fun HomeHeader(isFavorites: Boolean, modifier: Modifier = Modifier) {
+private fun HomeHeader(isFavorites: Boolean, typeName: String? = null, modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
-            text = stringResource(if (isFavorites) R.string.favorites_tab else R.string.home_title),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = stringResource(if (isFavorites) R.string.favorites_subtitle else R.string.home_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+                text = typeName?.replaceFirstChar { it.titlecase() }
+                    ?: stringResource(if (isFavorites) R.string.favorites_tab else R.string.home_title),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        if (typeName != null) {
+            Text(
+                text = stringResource(R.string.type_pokemon_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -167,12 +176,12 @@ private fun HomeHeader(isFavorites: Boolean, modifier: Modifier = Modifier) {
 private fun PokemonGrid(
     gridState: LazyGridState,
     uiState: PokemonListUiState,
-    onRetry: () -> Unit,
     onPokemonClick: (Int) -> Unit,
     filtersExpanded: Boolean,
     onTypeChanged: (String?) -> Unit,
     onSortOrderChanged: (PokemonSortOrder) -> Unit,
     onResetFilters: () -> Unit,
+    allowTypeChange: Boolean,
     modifier: Modifier = Modifier
 ) {
     LazyVerticalGrid(
@@ -191,6 +200,7 @@ private fun PokemonGrid(
                     onTypeChanged = onTypeChanged,
                     onSortOrderChanged = onSortOrderChanged,
                     onReset = onResetFilters,
+                    allowTypeChange = allowTypeChange,
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
@@ -220,9 +230,6 @@ private fun PokemonGrid(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    TextButton(onClick = onRetry, enabled = !uiState.isLoading) {
-                        Text(stringResource(R.string.home_retry), color = MaterialTheme.colorScheme.onSurface)
-                    }
                 }
             }
         }
